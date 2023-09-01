@@ -1,0 +1,122 @@
+			VINA++
+			Luize Cunha Duarte
+			GRR20221232
+
+1. A organização do archive.
+		Nos primeiros bytes, fica localizada as informações sobre os conteúdos, 
+	sendo 4 bytes para o número de arquivos e 8 bytes para o tamanho total dos conteúdos.
+	Dessa maneira fica fácil percorrer pelo archive, sabendo onde fica o diretório.
+	Logo após, fica os conteúdos em si dos arquivos. E, por fim, o diretório, o qual guarda
+	as informações contidas na struct diretorio a ser detalhada mais a frente. O diretório ao
+	fim do arquivo evita escritas e movimentações desnecessárias, pois basta escrever-lo
+	após as modificações no conteudo.
+
+2. As estruturas de dados criadas.
+           	Para ser manipulado, o diretório é carregado em um vetor de ponteiros para 
+	structs, dessa maneira é fácil de ler e escrever os arquivos em ordem pelos 
+	seus índices. Além disso, é carregada em uma struct do tipo conteudo as 
+	informações sobre o conteúdo citadas anteriormente. 
+
+	struct diretorio{
+		int tam_nome;
+		char* nome;
+		long long int tamanho;
+		long long int posicao;
+		uid_t uid;
+		mode_t permissoes;
+		time_t ultima_modificacao;
+	};
+
+	struct conteudo{
+		unsigned int num_arq;
+		long long int tam_conteudo, diretorio_pos;
+	};
+
+3. As funções principais.
+        	Dentre as opções que usuário terá, nas quais ele pode passar mais de um arquivo foi 
+	criado as funções “* _arg", responsáveis por lidar com o número de argumentos passados
+	e verificar se já existem no arquivo binário através da função id_arquivo. Foi decidido
+	fazer tal verificação nesta função para que funções responsáveis por manipular o 
+	conteúdo efetivamente possam ser usadas em outros lugares, sem que o vetor diretório 
+	seja percorrido sem necessidade. Além disso, ela verifica se o arquivo passado existe, 
+	caso não, ele não será inserido no archive, mas os outros argumentos passados, sim. 
+		Ao final das “*_arg”, quando necessário, as informações sobre o conteúdo, como 
+	número de arquivos e tamanho total dos conteúdos, é atualizada no começo do archive, além
+	de inserido o diretório ao fim do mesmo. A escrita no archive dessas informações são feitas 
+	apenas ao final da execução, não a cada modificação feita nos conteúdos, visando melhorar o 
+	desempenho do programa. Caso o archive, ao final da execução, esteja vazio, ele será excluído.
+
+a. A função de remover do Archive.
+		Quando chamada, a “exclui” primeiramente irá atualizar a struct “info_conteudo”. Se o arquivo
+	a ser removido for o último no archive, basta excluí-lo. Caso contrário, os conteúdos que vem
+	após o que deve ser excluído serão movidos para cima pela funcao “move_conteudo”, detalhada 
+	mais a frente. Por fim, o vetor do diretório é atualizado, mudando as posições dos arquivos. 
+
+b. A função de inserir.
+		Ela será chamada apenas para inserir efetivamente no archive, uma vez que a verificação se 
+	um arquivo deve ser substituído é feita na “insere_arg”, e então excluído caso deva. Quando
+	chamada, a “insere” irá atualizar as informações sobre o conteúdo e copiar o novo arquivo 
+	para o fim dos conteúdos utilizando a função “copia_texto” a ser detalhada. Por fim, as 
+	informações do arquivo serão adquiridas através da função “stat”, assim o vetor do diretório
+	poderá ser atualizado e retornado para que seja impresso corretamente, uma vez que seu 
+	tamanho aumentou. 
+
+c. A função de substituir. 
+		Ela verifica se é necessário realizar a substituição de arquivos no archive, para então 
+	substituí-los. Tal verificação é feita usando a função “verifica_sub” que compara as últimas
+	datas de modificação, retornando 1 se deve. Então, as funções de excluir e inserir são chamadas. 
+
+d. A função de extrair.
+		Primeiramente, é necessário criar os diretórios não existentes através da função 
+	“cria_dir”, para então o arquivo. Com o arquivo criado, o conteúdo do archive é copiado
+	através da função "copia_texto", e , então, as permissões atribuídas pela função "chmod”. 
+
+e. A função de mover.
+        	Como o archive foi organizado de maneira que não seja necessário os arquivos dentro
+	da área do conteúdo estarem na mesma ordem que no diretório, para reorganizar os arquivos
+	para o usuário basta alterar o diretório. Portanto, a função "move” irá verificar se o 
+	arquivo passado se localiza após ou antes do target, e mover no vetor do diretório os 
+	ponteiros necessários para inserir o desejado logo após o target. Por fim, basta imprimir
+	o diretório ao fim dos conteúdos no archive.
+
+4. Funções que manipulam o conteudo.
+a. A função conteudo.
+		Ela lê nos primeiros bytes do archive as informações do conteúdo, sendo estas tamanho,
+	número de arquivos e onde ele acaba – posição do diretório – retornando uma struct conteudo.
+
+b. A função copia_texto.
+		Com o objetivo de copiar uma parte de um arquivo para outro, ela recebe o arquivo de
+	leitura, o de escrita e o tamanho do bloco que será copiado. Sendo útil quando se deseja inserir
+	no archive e extrair dele.
+
+c. A função att_info_conteudo.
+		Chamada ao fim de diversas funções, ela é responsável por atualizar no começo do archive as informações
+	referentes ao número de arquivos guardados e o tamanho total de seus conteúdos. 
+
+d. A função move_conteudo. 
+		Utilizada na função de excluir, ela move para trás apenas o conteúdo localizado após o arquivo que
+	deseja remover, escrevendo por cima do mesmo. Para isso, são utilizadas variáveis que marcam a posição
+	antiga do conteúdo e para onde deseja subir-lo, usando um buffer que intercala entre as duas posições.
+
+5. As funções que manipulam o diretório.
+a. A Função le_diretorio.
+ 		Responsável por acessar o archivei e guardar em um vetor as informações contidas no diretório
+	sobre cada arquivo guardado. O vetor é  composto de ponteiros para structs do tipo diretorio 
+	citadas anteriormente.
+
+b. As funções adiciona_diretorio e imprime_diretorio.
+		A “adiciona_diretorio”, tem o objetivo de adicionar um novo arquivo no archive, ela atualiza o
+	tamanho do vetor de diretório e guarda em um novo espaço as informações recebidas pela função
+	stat,  retornando ele atualizado. Já a imprime, guarda o vetor atualizado ao fim dos conteúdos no archive.
+
+c. a função id_arquivo.
+		A função tem o objetivo de verificar onde está um arquivo no vetor de diretórios, retornando o seu
+	índice quando encontrado ou -1 quando o arquivo não se encontra no archive. 
+
+6. Abrindo arquivos.
+		Primeiramente, é necessário abrir os arquivos antes de manipullalos. 
+	Para isso foram criadas as funções “cria_arquivo” e “abre_arquivo”, as quais 
+	cria e fecha o programa, respectivamente, caso o arquivo a ser aberto não exista.
+
+
+
